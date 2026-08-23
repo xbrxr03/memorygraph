@@ -209,6 +209,25 @@ memorygraph project-obsidian --bank project:my-app \
 The Markdown is disposable and manifest-managed. SQLite observations and append-only events stay
 authoritative; edits to generated notes never silently mutate memory.
 
+## Dogfood Beta
+
+Beta adds a live, repository-owned evidence loop on top of the deterministic Alpha matrix. Start
+by bootstrapping the project bank, installing project-scoped MCP configuration, and probing the
+configured project database:
+
+```bash
+memorygraph dogfood bootstrap --database .memorygraph/memory.db \
+  --bank project:memorygraph --workspace agent-memory-research
+memorygraph install-codex --project .
+memorygraph probe-codex --project . --project-database --configured-only
+```
+
+Real-session instrumentation is explicit and append-only; MemoryGraph never scrapes private Codex
+history. Record approved `recall`, `attempt`, and `task` events with `memorygraph dogfood capture`,
+then run `make dogfood-live`. The report tracks successful tasks, useful recall precision,
+forbidden recall, repeated mistakes, latency, tokens, tool calls, and retries. The full operating
+contract and event schema are in [`13-dogfood-beta.md`](13-dogfood-beta.md).
+
 ## Why a graph?
 
 The graph gives agents composable structure: entities are nodes and claims such as

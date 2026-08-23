@@ -18,7 +18,12 @@ import typer
 
 from memorygraph import MemoryGraph, __version__
 from memorygraph.application import DurableWorkerService
-from memorygraph.dogfood import bootstrap_project_memory
+from memorygraph.dogfood import (
+    LiveSessionEvent,
+    LiveSessionLedger,
+    bootstrap_project_memory,
+    evaluate_live_sessions,
+)
 from memorygraph.integrations.codex import CodexSessionAdapter, probe_codex_mcp, report_to_dict
 from memorygraph.providers import OpenAICompatibleConfig, OpenAICompatibleDreamProvider
 from memorygraph.storage.database import MIGRATION_NAME_PATTERN, MigrationRunner
@@ -1052,6 +1057,53 @@ def dogfood_bootstrap(
             sort_keys=True,
         )
     )
+
+
+@dogfood_app.command("capture")
+def dogfood_capture(
+    event_json: Annotated[
+        str,
+        typer.Argument(help="Explicitly approved live-session event JSON object."),
+    ],
+    ledger: Annotated[
+        Path,
+        typer.Option("--ledger", help="Append-only live session event ledger."),
+    ] = Path(".memorygraph/dogfood/live-sessions.jsonl"),
+) -> None:
+    """Append one approved coding-session metric event without scraping host state."""
+
+    try:
+        payload = json.loads(event_json)
+        if not isinstance(payload, dict):
+            raise ValueError("event JSON must be an object")
+        event = LiveSessionEvent.from_mapping(payload)
+        LiveSessionLedger(ledger).append(event)
+    except (json.JSONDecodeError, ValueError) as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(json.dumps({"captured": True, "ledger": str(ledger)}, sort_keys=True))
+
+
+@dogfood_app.command("evaluate-live")
+def dogfood_evaluate_live(
+    ledger: Annotated[
+        Path,
+        typer.Option("--ledger", help="Append-only live session event ledger."),
+    ] = Path(".memorygraph/dogfood/live-sessions.jsonl"),
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional JSON report output path."),
+    ] = None,
+) -> None:
+    """Score approved live coding sessions using the Beta quality metrics."""
+
+    try:
+        report = evaluate_live_sessions(LiveSessionLedger(ledger).read())
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    typer.echo(json.dumps(report, sort_keys=True))
 
 
 def _dream_provider(model: str | None, endpoint: str, api_key_env: str):
