@@ -1,0 +1,139 @@
+{
+  "schema_version": "memoryrotbench.scenario/v1",
+  "scenario_id": "employment-historical-mention-001",
+  "title": "Current employer changes while older employer remains historical",
+  "category": "historical_mention_trap",
+  "bank_id": "user:alice",
+  "description": "Alice leaves Acme for Stripe and later mentions Acme nostalgically without restoring it as current employment.",
+  "acceptance_cases": [3, 4],
+  "entities": [
+    {
+      "entity_id": "person:alice",
+      "canonical_name": "Alice",
+      "type": "person",
+      "aliases": ["alice"]
+    },
+    {
+      "entity_id": "org:acme",
+      "canonical_name": "Acme",
+      "type": "organization",
+      "aliases": ["acme"]
+    },
+    {
+      "entity_id": "org:stripe",
+      "canonical_name": "Stripe",
+      "type": "organization",
+      "aliases": ["stripe"]
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "claim.alice_works_at_acme",
+      "subject": "person:alice",
+      "predicate": "works_at",
+      "object": {
+        "kind": "entity",
+        "value": "org:acme"
+      },
+      "cardinality": "one",
+      "stability": "volatile",
+      "valid_from": "2026-01-02T12:00:00Z",
+      "valid_to": "2026-03-04T12:00:00Z",
+      "lifecycle": "historical",
+      "summary": "Alice worked at Acme",
+      "evidence_event_ids": ["e1"],
+      "source_authority": "explicit_user"
+    },
+    {
+      "claim_id": "claim.alice_works_at_stripe",
+      "subject": "person:alice",
+      "predicate": "works_at",
+      "object": {
+        "kind": "entity",
+        "value": "org:stripe"
+      },
+      "cardinality": "one",
+      "stability": "volatile",
+      "valid_from": "2026-03-04T12:00:00Z",
+      "valid_to": null,
+      "lifecycle": "current",
+      "summary": "Alice works at Stripe",
+      "evidence_event_ids": ["e2"],
+      "source_authority": "explicit_user"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "e1",
+      "at": "2026-01-02T12:00:00Z",
+      "effective_at": "2026-01-02T12:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "I work at Acme.",
+      "expected_outcomes": [
+        {"action": "assert", "claim_id": "claim.alice_works_at_acme"}
+      ]
+    },
+    {
+      "event_id": "e2",
+      "at": "2026-03-04T12:00:00Z",
+      "effective_at": "2026-03-04T12:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "I started at Stripe today.",
+      "expected_outcomes": [
+        {"action": "supersede", "claim_id": "claim.alice_works_at_stripe"}
+      ]
+    },
+    {
+      "event_id": "e3",
+      "at": "2026-04-10T12:00:00Z",
+      "effective_at": "2026-04-10T12:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "My old Acme laptop had a great keyboard.",
+      "expected_outcomes": [
+        {"action": "historical_reference", "claim_id": "claim.alice_works_at_acme"}
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q_current",
+      "after_event": "e3",
+      "question": "Where does Alice work now?",
+      "outcome": {
+        "type": "answer",
+        "answer": "Stripe"
+      },
+      "required_claim_ids": ["claim.alice_works_at_stripe"],
+      "required_evidence_event_ids": ["e2"],
+      "forbidden_current_claim_ids": ["claim.alice_works_at_acme"],
+      "forbidden_bank_ids": [],
+      "forbidden_answer_fragments": []
+    },
+    {
+      "query_id": "q_february",
+      "after_event": "e3",
+      "question": "Where did Alice work in February?",
+      "outcome": {
+        "type": "answer",
+        "answer": "Acme"
+      },
+      "required_claim_ids": ["claim.alice_works_at_acme"],
+      "required_evidence_event_ids": ["e1"],
+      "forbidden_current_claim_ids": [],
+      "forbidden_bank_ids": [],
+      "forbidden_answer_fragments": []
+    }
+  ]
+}

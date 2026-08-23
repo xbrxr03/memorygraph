@@ -1,0 +1,69 @@
+{
+  "schema_version": "memoryrotbench.chaos_case/v1",
+  "case_id": "chaos-artifact-citation-cycle-001",
+  "title": "Artifact refresh rejects prior artifacts as factual source evidence",
+  "acceptance_case": 15,
+  "description": "Derived artifacts may cite claims but must not cite earlier artifacts as factual sources.",
+  "observations": [
+    {
+      "observation_id": "obs-1",
+      "content": "I work at Acme."
+    }
+  ],
+  "steps": [
+    {
+      "step_id": "s1",
+      "type": "process_proposal",
+      "label": "acme_run",
+      "proposal": {
+        "proposal_id": "proposal-acme",
+        "idempotency_key": "key-acme",
+        "claim_id": "claim.alice_acme",
+        "subject": "user:alice",
+        "predicate": "works_at",
+        "object_value": "Acme",
+        "evidence_spans": [
+          {
+            "observation_id": "obs-1",
+            "start": 0,
+            "end": 15
+          }
+        ]
+      },
+      "expect": {
+        "status": "committed"
+      }
+    },
+    {
+      "step_id": "s2",
+      "type": "refresh_artifact",
+      "label": "artifact_v1",
+      "artifact_id": "artifact.profile.v1",
+      "body": "Alice currently works at Acme.",
+      "source_claim_ids": ["claim.alice_acme"],
+      "expect": {
+        "status": "ok"
+      }
+    },
+    {
+      "step_id": "s3",
+      "type": "refresh_artifact",
+      "artifact_id": "artifact.profile.v2",
+      "body": "Alice currently works at Acme.",
+      "source_claim_ids": ["claim.alice_acme"],
+      "source_artifact_refs": ["artifact_v1"],
+      "expect": {
+        "exception": "ValueError"
+      }
+    }
+  ],
+  "final_assertion": {
+    "version": 1,
+    "active_claim_ids": ["claim.alice_acme"],
+    "evidence_ids": ["obs-1"],
+    "current_view": [["user:alice|works_at", "claim.alice_acme"]],
+    "artifact_ids": ["artifact_v1"],
+    "committed_run_ids": ["acme_run"],
+    "history_claim_ids": ["claim.alice_acme"]
+  }
+}

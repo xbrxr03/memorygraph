@@ -1,0 +1,99 @@
+{
+  "schema_version": "memoryrotbench.scenario/v1",
+  "scenario_id": "explicit-correction-001",
+  "title": "Explicit correction retracts the mistaken current claim",
+  "category": "negation_and_correction",
+  "bank_id": "project:atlas",
+  "description": "A mistaken cutover date is corrected explicitly and the current answer must use the corrected value.",
+  "acceptance_cases": [3],
+  "entities": [
+    {
+      "entity_id": "project:atlas",
+      "canonical_name": "Atlas",
+      "type": "project",
+      "aliases": ["atlas"]
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "claim.atlas_cutover_sep5",
+      "subject": "project:atlas",
+      "predicate": "release_cutover_date",
+      "object": {
+        "kind": "string",
+        "value": "2026-09-05"
+      },
+      "cardinality": "one",
+      "stability": "volatile",
+      "valid_from": "2026-06-01T15:00:00Z",
+      "valid_to": "2026-06-02T08:30:00Z",
+      "lifecycle": "retracted",
+      "summary": "Atlas release cutover is September 5, 2026",
+      "evidence_event_ids": ["e1"],
+      "source_authority": "explicit_user"
+    },
+    {
+      "claim_id": "claim.atlas_cutover_sep15",
+      "subject": "project:atlas",
+      "predicate": "release_cutover_date",
+      "object": {
+        "kind": "string",
+        "value": "2026-09-15"
+      },
+      "cardinality": "one",
+      "stability": "volatile",
+      "valid_from": "2026-06-02T08:30:00Z",
+      "valid_to": null,
+      "lifecycle": "current",
+      "summary": "Atlas release cutover is September 15, 2026",
+      "evidence_event_ids": ["e2"],
+      "source_authority": "explicit_user"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "e1",
+      "at": "2026-06-01T15:00:00Z",
+      "effective_at": "2026-06-01T15:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "The Atlas release cutover is September 5.",
+      "expected_outcomes": [
+        {"action": "assert", "claim_id": "claim.atlas_cutover_sep5"}
+      ]
+    },
+    {
+      "event_id": "e2",
+      "at": "2026-06-02T08:30:00Z",
+      "effective_at": "2026-06-02T08:30:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "Correction: I meant September 15, not September 5.",
+      "expected_outcomes": [
+        {"action": "correction", "claim_id": "claim.atlas_cutover_sep15"}
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q1",
+      "after_event": "e2",
+      "question": "What is Atlas's current release cutover date?",
+      "outcome": {
+        "type": "answer",
+        "answer": "2026-09-15"
+      },
+      "required_claim_ids": ["claim.atlas_cutover_sep15"],
+      "required_evidence_event_ids": ["e2"],
+      "forbidden_current_claim_ids": ["claim.atlas_cutover_sep5"],
+      "forbidden_bank_ids": [],
+      "forbidden_answer_fragments": []
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "schema_version": "memoryrotbench.scenario/v1",
+  "scenario_id": "multi-valued-hobbies-001",
+  "title": "Many-cardinality predicates preserve simultaneous truths",
+  "category": "multi_valued_truth",
+  "bank_id": "user:sam",
+  "description": "Two hobbies should coexist rather than supersede each other.",
+  "acceptance_cases": [5],
+  "entities": [
+    {
+      "entity_id": "person:sam",
+      "canonical_name": "Sam",
+      "type": "person",
+      "aliases": ["sam"]
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "claim.sam_hobby_running",
+      "subject": "person:sam",
+      "predicate": "has_hobby",
+      "object": {
+        "kind": "string",
+        "value": "running"
+      },
+      "cardinality": "many",
+      "stability": "durable",
+      "valid_from": "2026-02-01T10:00:00Z",
+      "valid_to": null,
+      "lifecycle": "current",
+      "summary": "Sam enjoys running",
+      "evidence_event_ids": ["e1"],
+      "source_authority": "explicit_user"
+    },
+    {
+      "claim_id": "claim.sam_hobby_chess",
+      "subject": "person:sam",
+      "predicate": "has_hobby",
+      "object": {
+        "kind": "string",
+        "value": "chess"
+      },
+      "cardinality": "many",
+      "stability": "durable",
+      "valid_from": "2026-02-02T10:00:00Z",
+      "valid_to": null,
+      "lifecycle": "current",
+      "summary": "Sam enjoys chess",
+      "evidence_event_ids": ["e2"],
+      "source_authority": "explicit_user"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "e1",
+      "at": "2026-02-01T10:00:00Z",
+      "effective_at": "2026-02-01T10:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "One of my hobbies is running.",
+      "expected_outcomes": [
+        {"action": "assert", "claim_id": "claim.sam_hobby_running"}
+      ]
+    },
+    {
+      "event_id": "e2",
+      "at": "2026-02-02T10:00:00Z",
+      "effective_at": "2026-02-02T10:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "I also play chess every weekend.",
+      "expected_outcomes": [
+        {"action": "coexists", "claim_id": "claim.sam_hobby_chess"}
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q1",
+      "after_event": "e2",
+      "question": "What hobbies does Sam currently have?",
+      "outcome": {
+        "type": "answer",
+        "answer": "running and chess"
+      },
+      "acceptable_answers": ["chess and running"],
+      "required_claim_ids": [
+        "claim.sam_hobby_running",
+        "claim.sam_hobby_chess"
+      ],
+      "required_evidence_event_ids": ["e1", "e2"],
+      "forbidden_current_claim_ids": [],
+      "forbidden_bank_ids": [],
+      "forbidden_answer_fragments": []
+    }
+  ]
+}

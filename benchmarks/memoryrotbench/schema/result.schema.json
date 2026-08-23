@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://memorygraph.dev/memoryrotbench/result.schema.json",
+  "title": "MemoryRotBench Retrieval Result",
+  "type": "object",
+  "required": [
+    "run_id",
+    "adapter_name",
+    "scenario_id",
+    "query_id",
+    "bank_id",
+    "context_event_ids",
+    "token_estimate"
+  ],
+  "properties": {
+    "run_id": {"type": "string", "minLength": 1},
+    "adapter_name": {"type": "string", "minLength": 1},
+    "scenario_id": {"type": "string", "minLength": 1},
+    "query_id": {"type": "string", "minLength": 1},
+    "bank_id": {"type": "string", "minLength": 1},
+    "context_event_ids": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "token_estimate": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

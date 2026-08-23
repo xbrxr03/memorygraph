@@ -1,0 +1,52 @@
+{
+  "schema_version": "memoryrotbench.chaos_case/v1",
+  "case_id": "chaos-source-deletion-001",
+  "title": "Deleting source evidence invalidates dependent current state",
+  "acceptance_case": 14,
+  "description": "Removing the supporting observation should clear the dependent claim from current state.",
+  "observations": [
+    {
+      "observation_id": "obs-1",
+      "content": "Deploy Delta with ./scripts/deploy.sh --prod."
+    }
+  ],
+  "steps": [
+    {
+      "step_id": "s1",
+      "type": "process_proposal",
+      "label": "deploy_run",
+      "proposal": {
+        "proposal_id": "proposal-deploy-command",
+        "idempotency_key": "key-deploy-command",
+        "claim_id": "claim.delta_deploy_command",
+        "subject": "project:delta",
+        "predicate": "deploy_command",
+        "object_value": "./scripts/deploy.sh --prod",
+        "evidence_spans": [
+          {
+            "observation_id": "obs-1",
+            "start": 0,
+            "end": 24
+          }
+        ]
+      },
+      "expect": {
+        "status": "committed"
+      }
+    },
+    {
+      "step_id": "s2",
+      "type": "delete_evidence",
+      "observation_id": "obs-1"
+    }
+  ],
+  "final_assertion": {
+    "version": 2,
+    "active_claim_ids": [],
+    "evidence_ids": [],
+    "current_view": [],
+    "artifact_ids": [],
+    "committed_run_ids": ["deploy_run"],
+    "history_claim_ids": ["claim.delta_deploy_command"]
+  }
+}

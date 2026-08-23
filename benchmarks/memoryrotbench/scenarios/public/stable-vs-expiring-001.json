@@ -1,0 +1,126 @@
+{
+  "schema_version": "memoryrotbench.scenario/v1",
+  "scenario_id": "stable-vs-expiring-001",
+  "title": "Stable facts survive while expiring state falls out of current recall",
+  "category": "expiring_state",
+  "bank_id": "user:lee",
+  "description": "An immutable personal fact remains available while an old sprint goal should no longer be treated as current.",
+  "acceptance_cases": [3],
+  "entities": [
+    {
+      "entity_id": "person:lee",
+      "canonical_name": "Lee",
+      "type": "person",
+      "aliases": ["lee"]
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "claim.lee_birth_date",
+      "subject": "person:lee",
+      "predicate": "birth_date",
+      "object": {
+        "kind": "string",
+        "value": "1990-03-14"
+      },
+      "cardinality": "one",
+      "stability": "immutable",
+      "valid_from": "2026-01-01T09:00:00Z",
+      "valid_to": null,
+      "lifecycle": "current",
+      "summary": "Lee's birth date is March 14, 1990",
+      "evidence_event_ids": ["e1"],
+      "source_authority": "explicit_user"
+    },
+    {
+      "claim_id": "claim.lee_sprint_goal_export_cli",
+      "subject": "person:lee",
+      "predicate": "current_sprint_goal",
+      "object": {
+        "kind": "string",
+        "value": "ship the export CLI"
+      },
+      "cardinality": "one",
+      "stability": "ephemeral",
+      "valid_from": "2026-05-01T09:00:00Z",
+      "valid_to": "2026-05-15T23:59:59Z",
+      "lifecycle": "expired",
+      "summary": "Lee's sprint goal is to ship the export CLI",
+      "evidence_event_ids": ["e2"],
+      "source_authority": "explicit_user"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "e1",
+      "at": "2026-01-01T09:00:00Z",
+      "effective_at": "2026-01-01T09:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "My birthday is March 14, 1990.",
+      "expected_outcomes": [
+        {"action": "assert", "claim_id": "claim.lee_birth_date"}
+      ]
+    },
+    {
+      "event_id": "e2",
+      "at": "2026-05-01T09:00:00Z",
+      "effective_at": "2026-05-01T09:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "This sprint's goal is to ship the export CLI by May 15.",
+      "expected_outcomes": [
+        {"action": "assert", "claim_id": "claim.lee_sprint_goal_export_cli"}
+      ]
+    },
+    {
+      "event_id": "e3",
+      "at": "2026-06-10T09:00:00Z",
+      "effective_at": "2026-06-10T09:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "We are planning the June backlog now.",
+      "expected_outcomes": [
+        {"action": "expire", "claim_id": "claim.lee_sprint_goal_export_cli"}
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q_birth_date",
+      "after_event": "e3",
+      "question": "What is Lee's birth date?",
+      "outcome": {
+        "type": "answer",
+        "answer": "1990-03-14"
+      },
+      "required_claim_ids": ["claim.lee_birth_date"],
+      "required_evidence_event_ids": ["e1"],
+      "forbidden_current_claim_ids": [],
+      "forbidden_bank_ids": [],
+      "forbidden_answer_fragments": []
+    },
+    {
+      "query_id": "q_sprint_goal",
+      "after_event": "e3",
+      "question": "What is Lee's current sprint goal?",
+      "outcome": {
+        "type": "abstain"
+      },
+      "required_claim_ids": [],
+      "required_evidence_event_ids": [],
+      "forbidden_current_claim_ids": ["claim.lee_sprint_goal_export_cli"],
+      "forbidden_bank_ids": [],
+      "forbidden_answer_fragments": []
+    }
+  ]
+}

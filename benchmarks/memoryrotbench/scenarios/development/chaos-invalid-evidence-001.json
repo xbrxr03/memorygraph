@@ -1,0 +1,51 @@
+{
+  "schema_version": "memoryrotbench.chaos_case/v1",
+  "case_id": "chaos-invalid-evidence-001",
+  "title": "Invalid evidence span causes zero mutation",
+  "acceptance_case": 9,
+  "description": "Evidence validation failure must leave the runtime unchanged.",
+  "observations": [
+    {
+      "observation_id": "obs-1",
+      "content": "short text"
+    }
+  ],
+  "steps": [
+    {
+      "step_id": "s1",
+      "type": "capture_snapshot",
+      "label": "before"
+    },
+    {
+      "step_id": "s2",
+      "type": "process_proposal",
+      "proposal": {
+        "proposal_id": "proposal-invalid-span",
+        "idempotency_key": "key-invalid-span",
+        "claim_id": "claim.invalid",
+        "subject": "user:alice",
+        "predicate": "works_at",
+        "object_value": "Stripe",
+        "evidence_spans": [
+          {
+            "observation_id": "obs-1",
+            "start": 0,
+            "end": 50
+          }
+        ]
+      },
+      "expect": {
+        "exception": "ValueError"
+      }
+    }
+  ],
+  "final_assertion": {
+    "version": 0,
+    "active_claim_ids": [],
+    "evidence_ids": ["obs-1"],
+    "current_view": [],
+    "artifact_ids": [],
+    "committed_run_ids": [],
+    "history_claim_ids": []
+  }
+}

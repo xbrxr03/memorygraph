@@ -1,0 +1,102 @@
+{
+  "schema_version": "memoryrotbench.scenario/v1",
+  "scenario_id": "duplicate-confirmation-001",
+  "title": "Exact duplicate and paraphrased confirmation reinforce one claim",
+  "category": "duplicate_paraphrase",
+  "bank_id": "user:mira",
+  "description": "The same editor preference is observed twice verbatim and once as a paraphrase without creating a second claim.",
+  "acceptance_cases": [1, 2],
+  "entities": [
+    {
+      "entity_id": "person:mira",
+      "canonical_name": "Mira",
+      "type": "person",
+      "aliases": ["mira"]
+    },
+    {
+      "entity_id": "tool:neovim",
+      "canonical_name": "Neovim",
+      "type": "tool",
+      "aliases": ["nvim", "neovim"]
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "claim.mira_primary_editor_neovim",
+      "subject": "person:mira",
+      "predicate": "primary_editor",
+      "object": {
+        "kind": "entity",
+        "value": "tool:neovim"
+      },
+      "cardinality": "one",
+      "stability": "durable",
+      "valid_from": "2026-01-05T09:00:00Z",
+      "valid_to": null,
+      "lifecycle": "current",
+      "summary": "Mira's primary editor is Neovim",
+      "evidence_event_ids": ["e1", "e2", "e3"],
+      "source_authority": "explicit_user"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "e1",
+      "at": "2026-01-05T09:00:00Z",
+      "effective_at": "2026-01-05T09:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "I use Neovim as my main editor.",
+      "expected_outcomes": [
+        {"action": "assert", "claim_id": "claim.mira_primary_editor_neovim"}
+      ]
+    },
+    {
+      "event_id": "e2",
+      "at": "2026-01-06T09:00:00Z",
+      "effective_at": "2026-01-06T09:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "I use Neovim as my main editor.",
+      "expected_outcomes": [
+        {"action": "confirm", "claim_id": "claim.mira_primary_editor_neovim"}
+      ]
+    },
+    {
+      "event_id": "e3",
+      "at": "2026-01-07T09:00:00Z",
+      "effective_at": "2026-01-07T09:00:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "Still on nvim as my daily driver.",
+      "expected_outcomes": [
+        {"action": "confirm", "claim_id": "claim.mira_primary_editor_neovim"}
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q1",
+      "after_event": "e3",
+      "question": "What is Mira's primary editor?",
+      "outcome": {
+        "type": "answer",
+        "answer": "Neovim"
+      },
+      "required_claim_ids": ["claim.mira_primary_editor_neovim"],
+      "required_evidence_event_ids": ["e1", "e2", "e3"],
+      "forbidden_current_claim_ids": [],
+      "forbidden_bank_ids": [],
+      "forbidden_answer_fragments": []
+    }
+  ]
+}

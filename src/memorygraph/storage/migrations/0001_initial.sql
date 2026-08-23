@@ -1,0 +1,523 @@
+CREATE TABLE schema_metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+INSERT INTO schema_metadata(key, value) VALUES
+    ('schema_version', '1'),
+    ('minimum_reader_version', '1'),
+    ('export_format_version', '1');
+
+CREATE TABLE banks (
+    id TEXT PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    mission TEXT,
+    policy_json TEXT NOT NULL DEFAULT '{}'
+        CHECK (json_valid(policy_json)),
+    created_at TEXT NOT NULL,
+    archived_at TEXT,
+    CHECK (archived_at IS NULL OR archived_at >= created_at)
+);
+
+CREATE TABLE observations (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN (
+        'message', 'tool_result', 'file', 'document', 'event',
+        'explicit_assertion', 'import'
+    )),
+    source_key TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    content TEXT NOT NULL,
+    actor_type TEXT NOT NULL CHECK (actor_type IN (
+        'user', 'agent', 'tool', 'system', 'external'
+    )),
+    actor_id TEXT,
+    observed_at TEXT NOT NULL,
+    effective_at TEXT,
+    trust_class TEXT NOT NULL CHECK (trust_class IN (
+        'owner_explicit', 'authoritative_tool', 'authoritative_source',
+        'direct_observation', 'imported', 'model_generated', 'untrusted'
+    )),
+    sensitivity TEXT NOT NULL DEFAULT 'normal' CHECK (sensitivity IN (
+        'public', 'normal', 'sensitive', 'secret', 'quarantined'
+    )),
+    metadata_json TEXT NOT NULL DEFAULT '{}'
+        CHECK (json_valid(metadata_json)),
+    ingestion_state TEXT NOT NULL DEFAULT 'pending' CHECK (ingestion_state IN (
+        'pending', 'processing', 'processed', 'partial', 'failed',
+        'quarantined', 'deleted'
+    )),
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    UNIQUE (bank_id, source_key, content_sha256),
+    FOREIGN KEY (bank_id) REFERENCES banks(id)
+);
+
+CREATE INDEX idx_observations_bank_source
+    ON observations(bank_id, source_key, observed_at);
+CREATE INDEX idx_observations_bank_state
+    ON observations(bank_id, ingestion_state, observed_at);
+CREATE INDEX idx_observations_bank_effective
+    ON observations(bank_id, effective_at);
+
+CREATE TABLE observation_chunks (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    observation_id TEXT NOT NULL,
+    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+    start_offset INTEGER NOT NULL CHECK (start_offset >= 0),
+    end_offset INTEGER NOT NULL CHECK (end_offset >= start_offset),
+    content TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    UNIQUE (bank_id, observation_id, ordinal),
+    FOREIGN KEY (bank_id, observation_id)
+        REFERENCES observations(bank_id, id)
+);
+
+CREATE INDEX idx_chunks_bank_observation
+    ON observation_chunks(bank_id, observation_id, ordinal);
+
+CREATE TABLE entities (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    canonical_name TEXT NOT NULL,
+    normalized_name TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN (
+        'active', 'merged', 'archived'
+    )),
+    merged_into_id TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    CHECK (
+        (status = 'merged' AND merged_into_id IS NOT NULL) OR
+        (status <> 'merged' AND merged_into_id IS NULL)
+    ),
+    FOREIGN KEY (bank_id) REFERENCES banks(id),
+    FOREIGN KEY (bank_id, merged_into_id)
+        REFERENCES entities(bank_id, id)
+);
+
+CREATE INDEX idx_entities_bank_name
+    ON entities(bank_id, normalized_name, entity_type);
+CREATE INDEX idx_entities_bank_status
+    ON entities(bank_id, status);
+
+CREATE TABLE entity_aliases (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    alias TEXT NOT NULL,
+    normalized_alias TEXT NOT NULL,
+    source_observation_id TEXT,
+    confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    UNIQUE (bank_id, entity_id, normalized_alias, source_observation_id),
+    FOREIGN KEY (bank_id, entity_id)
+        REFERENCES entities(bank_id, id),
+    FOREIGN KEY (bank_id, source_observation_id)
+        REFERENCES observations(bank_id, id)
+);
+
+CREATE INDEX idx_aliases_bank_normalized
+    ON entity_aliases(bank_id, normalized_alias);
+
+CREATE TABLE predicate_definitions (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT,
+    name TEXT NOT NULL,
+    subject_type TEXT,
+    object_type TEXT,
+    cardinality TEXT NOT NULL CHECK (cardinality IN ('one', 'many', 'event')),
+    volatility TEXT NOT NULL CHECK (volatility IN (
+        'immutable', 'durable', 'volatile', 'ephemeral'
+    )),
+    conflict_policy TEXT NOT NULL DEFAULT 'conservative' CHECK (conflict_policy IN (
+        'conservative', 'latest_equal_authority', 'authoritative_source',
+        'manual_only'
+    )),
+    default_validity_seconds INTEGER
+        CHECK (default_validity_seconds IS NULL OR default_validity_seconds > 0),
+    sensitivity TEXT NOT NULL DEFAULT 'normal' CHECK (sensitivity IN (
+        'public', 'normal', 'sensitive', 'protected'
+    )),
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, name),
+    FOREIGN KEY (bank_id) REFERENCES banks(id)
+);
+
+CREATE INDEX idx_predicates_name
+    ON predicate_definitions(name, bank_id);
+
+CREATE TABLE dream_runs (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    trigger TEXT NOT NULL,
+    mode TEXT NOT NULL CHECK (mode IN ('apply', 'dry_run', 'review_only')),
+    state TEXT NOT NULL CHECK (state IN (
+        'queued', 'leased', 'running', 'awaiting_review',
+        'completed', 'failed', 'canceled'
+    )),
+    input_watermark INTEGER NOT NULL DEFAULT 0 CHECK (input_watermark >= 0),
+    policy_version TEXT NOT NULL,
+    provider_config_hash TEXT NOT NULL,
+    lease_owner TEXT,
+    lease_expires_at TEXT,
+    attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+    budget_json TEXT NOT NULL DEFAULT '{}'
+        CHECK (json_valid(budget_json)),
+    usage_json TEXT NOT NULL DEFAULT '{}'
+        CHECK (json_valid(usage_json)),
+    error_json TEXT CHECK (error_json IS NULL OR json_valid(error_json)),
+    started_at TEXT,
+    completed_at TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    FOREIGN KEY (bank_id) REFERENCES banks(id)
+);
+
+CREATE INDEX idx_dream_runs_queue
+    ON dream_runs(state, lease_expires_at, created_at);
+CREATE INDEX idx_dream_runs_bank
+    ON dream_runs(bank_id, created_at);
+
+CREATE TABLE claims (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    subject_entity_id TEXT NOT NULL,
+    predicate TEXT NOT NULL,
+    object_kind TEXT NOT NULL CHECK (object_kind IN (
+        'entity', 'string', 'number', 'boolean', 'datetime', 'json'
+    )),
+    object_entity_id TEXT,
+    object_value_json TEXT
+        CHECK (object_value_json IS NULL OR json_valid(object_value_json)),
+    polarity TEXT NOT NULL DEFAULT 'positive'
+        CHECK (polarity IN ('positive', 'negative')),
+    valid_from TEXT,
+    valid_to TEXT,
+    system_from TEXT NOT NULL,
+    system_to TEXT,
+    lifecycle TEXT NOT NULL CHECK (lifecycle IN (
+        'active', 'contested', 'retracted', 'superseded'
+    )),
+    origin TEXT NOT NULL CHECK (origin IN (
+        'explicit', 'extracted', 'imported', 'derived'
+    )),
+    importance REAL NOT NULL DEFAULT 0.5
+        CHECK (importance >= 0 AND importance <= 1),
+    created_by_run_id TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    CHECK (valid_to IS NULL OR valid_from IS NULL OR valid_to > valid_from),
+    CHECK (system_to IS NULL OR system_to > system_from),
+    CHECK (
+        (object_kind = 'entity' AND object_entity_id IS NOT NULL AND object_value_json IS NULL) OR
+        (object_kind <> 'entity' AND object_entity_id IS NULL AND object_value_json IS NOT NULL)
+    ),
+    FOREIGN KEY (bank_id, subject_entity_id)
+        REFERENCES entities(bank_id, id),
+    FOREIGN KEY (bank_id, object_entity_id)
+        REFERENCES entities(bank_id, id),
+    FOREIGN KEY (bank_id, created_by_run_id)
+        REFERENCES dream_runs(bank_id, id)
+);
+
+CREATE INDEX idx_claims_current_slot
+    ON claims(bank_id, subject_entity_id, predicate, lifecycle, system_to);
+CREATE INDEX idx_claims_valid_time
+    ON claims(bank_id, valid_from, valid_to);
+CREATE INDEX idx_claims_system_time
+    ON claims(bank_id, system_from, system_to);
+CREATE INDEX idx_claims_object_entity
+    ON claims(bank_id, object_entity_id, predicate);
+CREATE INDEX idx_claims_run
+    ON claims(bank_id, created_by_run_id);
+
+CREATE TABLE claim_evidence (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    claim_id TEXT NOT NULL,
+    observation_id TEXT NOT NULL,
+    chunk_id TEXT,
+    start_offset INTEGER NOT NULL CHECK (start_offset >= 0),
+    end_offset INTEGER NOT NULL CHECK (end_offset >= start_offset),
+    excerpt TEXT NOT NULL,
+    stance TEXT NOT NULL CHECK (stance IN ('supports', 'contradicts', 'mentions')),
+    explicitness TEXT NOT NULL CHECK (explicitness IN (
+        'explicit', 'strongly_implied', 'inferred'
+    )),
+    source_reliability REAL NOT NULL
+        CHECK (source_reliability >= 0 AND source_reliability <= 1),
+    extraction_confidence REAL NOT NULL
+        CHECK (extraction_confidence >= 0 AND extraction_confidence <= 1),
+    extractor_name TEXT NOT NULL,
+    extractor_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    UNIQUE (
+        bank_id, claim_id, observation_id, chunk_id,
+        start_offset, end_offset, stance
+    ),
+    FOREIGN KEY (bank_id, claim_id)
+        REFERENCES claims(bank_id, id),
+    FOREIGN KEY (bank_id, observation_id)
+        REFERENCES observations(bank_id, id),
+    FOREIGN KEY (bank_id, chunk_id)
+        REFERENCES observation_chunks(bank_id, id)
+);
+
+CREATE INDEX idx_evidence_claim
+    ON claim_evidence(bank_id, claim_id, stance);
+CREATE INDEX idx_evidence_observation
+    ON claim_evidence(bank_id, observation_id);
+
+CREATE TABLE claim_relations (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    from_claim_id TEXT NOT NULL,
+    to_claim_id TEXT NOT NULL,
+    relation TEXT NOT NULL CHECK (relation IN (
+        'supersedes', 'contradicts', 'refines', 'duplicates', 'derived_from'
+    )),
+    rationale TEXT NOT NULL,
+    decision_method TEXT NOT NULL CHECK (decision_method IN (
+        'explicit', 'rule', 'model_proposal', 'human_review'
+    )),
+    decision_confidence REAL NOT NULL
+        CHECK (decision_confidence >= 0 AND decision_confidence <= 1),
+    dream_run_id TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    UNIQUE (bank_id, from_claim_id, to_claim_id, relation),
+    CHECK (from_claim_id <> to_claim_id),
+    FOREIGN KEY (bank_id, from_claim_id)
+        REFERENCES claims(bank_id, id),
+    FOREIGN KEY (bank_id, to_claim_id)
+        REFERENCES claims(bank_id, id),
+    FOREIGN KEY (bank_id, dream_run_id)
+        REFERENCES dream_runs(bank_id, id)
+);
+
+CREATE INDEX idx_relations_from
+    ON claim_relations(bank_id, from_claim_id, relation);
+CREATE INDEX idx_relations_to
+    ON claim_relations(bank_id, to_claim_id, relation);
+
+CREATE TABLE directives (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    text TEXT NOT NULL,
+    authority TEXT NOT NULL CHECK (authority IN (
+        'owner', 'administrator', 'application'
+    )),
+    source_observation_id TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+    valid_from TEXT,
+    valid_to TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    CHECK (valid_to IS NULL OR valid_from IS NULL OR valid_to > valid_from),
+    FOREIGN KEY (bank_id) REFERENCES banks(id),
+    FOREIGN KEY (bank_id, source_observation_id)
+        REFERENCES observations(bank_id, id)
+);
+
+CREATE INDEX idx_directives_current
+    ON directives(bank_id, enabled, scope, valid_from, valid_to);
+
+CREATE TABLE artifacts (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN (
+        'profile', 'topic_summary', 'runbook', 'export'
+    )),
+    artifact_key TEXT NOT NULL,
+    content TEXT NOT NULL,
+    source_claim_ids_json TEXT NOT NULL
+        CHECK (json_valid(source_claim_ids_json)),
+    source_watermark INTEGER NOT NULL CHECK (source_watermark >= 0),
+    generator_name TEXT NOT NULL,
+    generator_version TEXT NOT NULL,
+    stale_at TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    UNIQUE (bank_id, kind, artifact_key, source_watermark),
+    FOREIGN KEY (bank_id) REFERENCES banks(id)
+);
+
+CREATE INDEX idx_artifacts_current
+    ON artifacts(bank_id, kind, artifact_key, stale_at, source_watermark);
+
+CREATE TABLE embeddings (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    resource_type TEXT NOT NULL CHECK (resource_type IN (
+        'observation_chunk', 'entity', 'claim', 'artifact'
+    )),
+    resource_id TEXT NOT NULL,
+    model TEXT NOT NULL,
+    dimensions INTEGER NOT NULL CHECK (dimensions > 0),
+    content_sha256 TEXT NOT NULL,
+    vector_blob BLOB NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    UNIQUE (bank_id, resource_type, resource_id, model, content_sha256),
+    FOREIGN KEY (bank_id) REFERENCES banks(id)
+);
+
+CREATE INDEX idx_embeddings_resource
+    ON embeddings(bank_id, resource_type, resource_id, model);
+
+CREATE TABLE memory_events (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE,
+    bank_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    aggregate_type TEXT NOT NULL,
+    aggregate_id TEXT NOT NULL,
+    actor_type TEXT NOT NULL CHECK (actor_type IN (
+        'user', 'agent', 'tool', 'system', 'worker', 'administrator'
+    )),
+    actor_id TEXT,
+    payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
+    idempotency_key TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, idempotency_key),
+    FOREIGN KEY (bank_id) REFERENCES banks(id)
+);
+
+CREATE INDEX idx_events_bank_sequence
+    ON memory_events(bank_id, sequence);
+CREATE INDEX idx_events_aggregate
+    ON memory_events(bank_id, aggregate_type, aggregate_id, sequence);
+
+CREATE TABLE dream_tasks (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    dream_run_id TEXT NOT NULL,
+    task_type TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN (
+        'queued', 'leased', 'running', 'completed', 'failed', 'canceled'
+    )),
+    input_json TEXT NOT NULL CHECK (json_valid(input_json)),
+    output_json TEXT CHECK (output_json IS NULL OR json_valid(output_json)),
+    error_json TEXT CHECK (error_json IS NULL OR json_valid(error_json)),
+    lease_owner TEXT,
+    lease_expires_at TEXT,
+    attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+    created_at TEXT NOT NULL,
+    completed_at TEXT,
+    UNIQUE (bank_id, id),
+    UNIQUE (bank_id, idempotency_key),
+    FOREIGN KEY (bank_id, dream_run_id)
+        REFERENCES dream_runs(bank_id, id)
+);
+
+CREATE INDEX idx_dream_tasks_queue
+    ON dream_tasks(state, lease_expires_at, created_at);
+CREATE INDEX idx_dream_tasks_run
+    ON dream_tasks(bank_id, dream_run_id, state);
+
+CREATE TABLE dream_proposals (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    dream_run_id TEXT NOT NULL,
+    proposal_type TEXT NOT NULL,
+    preconditions_json TEXT NOT NULL CHECK (json_valid(preconditions_json)),
+    action_json TEXT NOT NULL CHECK (json_valid(action_json)),
+    evidence_ids_json TEXT NOT NULL CHECK (json_valid(evidence_ids_json)),
+    model_trace_json TEXT CHECK (model_trace_json IS NULL OR json_valid(model_trace_json)),
+    validation_json TEXT NOT NULL DEFAULT '{}'
+        CHECK (json_valid(validation_json)),
+    disposition TEXT NOT NULL CHECK (disposition IN (
+        'pending', 'auto_eligible', 'review_required', 'approved',
+        'rejected', 'committed', 'stale'
+    )),
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, id),
+    FOREIGN KEY (bank_id, dream_run_id)
+        REFERENCES dream_runs(bank_id, id)
+);
+
+CREATE INDEX idx_proposals_review
+    ON dream_proposals(bank_id, disposition, created_at);
+CREATE INDEX idx_proposals_run
+    ON dream_proposals(bank_id, dream_run_id);
+
+CREATE TABLE review_items (
+    id TEXT PRIMARY KEY,
+    bank_id TEXT NOT NULL,
+    proposal_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN (
+        'pending', 'approved', 'edited', 'rejected', 'quarantined'
+    )),
+    reviewer_type TEXT,
+    reviewer_id TEXT,
+    decision_json TEXT CHECK (decision_json IS NULL OR json_valid(decision_json)),
+    created_at TEXT NOT NULL,
+    decided_at TEXT,
+    UNIQUE (bank_id, id),
+    UNIQUE (bank_id, proposal_id),
+    FOREIGN KEY (bank_id, proposal_id)
+        REFERENCES dream_proposals(bank_id, id)
+);
+
+CREATE INDEX idx_reviews_pending
+    ON review_items(bank_id, state, created_at);
+
+CREATE TABLE search_documents (
+    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+    bank_id TEXT NOT NULL,
+    resource_type TEXT NOT NULL CHECK (resource_type IN (
+        'observation_chunk', 'entity', 'claim', 'artifact'
+    )),
+    resource_id TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL,
+    metadata_text TEXT NOT NULL DEFAULT '',
+    content_sha256 TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (bank_id, resource_type, resource_id),
+    FOREIGN KEY (bank_id) REFERENCES banks(id)
+);
+
+CREATE VIRTUAL TABLE search_fts USING fts5(
+    title,
+    body,
+    metadata_text,
+    content='search_documents',
+    content_rowid='rowid',
+    tokenize='unicode61 remove_diacritics 2'
+);
+
+CREATE TRIGGER search_documents_ai AFTER INSERT ON search_documents BEGIN
+    INSERT INTO search_fts(rowid, title, body, metadata_text)
+    VALUES (new.rowid, new.title, new.body, new.metadata_text);
+END;
+
+CREATE TRIGGER search_documents_ad AFTER DELETE ON search_documents BEGIN
+    INSERT INTO search_fts(search_fts, rowid, title, body, metadata_text)
+    VALUES ('delete', old.rowid, old.title, old.body, old.metadata_text);
+END;
+
+CREATE TRIGGER search_documents_au AFTER UPDATE ON search_documents BEGIN
+    INSERT INTO search_fts(search_fts, rowid, title, body, metadata_text)
+    VALUES ('delete', old.rowid, old.title, old.body, old.metadata_text);
+    INSERT INTO search_fts(rowid, title, body, metadata_text)
+    VALUES (new.rowid, new.title, new.body, new.metadata_text);
+END;
+
+CREATE INDEX idx_search_documents_resource
+    ON search_documents(bank_id, resource_type, resource_id);

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://memorygraph.dev/memoryrotbench/chaos_case.schema.json",
+  "title": "MemoryRotBench Chaos Case v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "case_id",
+    "title",
+    "acceptance_case",
+    "description",
+    "observations",
+    "steps"
+  ],
+  "properties": {
+    "schema_version": { "const": "memoryrotbench.chaos_case/v1" },
+    "case_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "acceptance_case": { "type": "integer", "minimum": 9, "maximum": 15 },
+    "description": { "type": "string", "minLength": 1 },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["observation_id", "content"],
+        "properties": {
+          "observation_id": { "type": "string", "minLength": 1 },
+          "content": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["step_id", "type"],
+        "properties": {
+          "step_id": { "type": "string", "minLength": 1 },
+          "type": {
+            "type": "string",
+            "enum": [
+              "capture_snapshot",
+              "process_proposal",
+              "rollback",
+              "delete_evidence",
+              "refresh_artifact",
+              "assert_snapshot"
+            ]
+          },
+          "label": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": true
+      }
+    },
+    "final_assertion": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

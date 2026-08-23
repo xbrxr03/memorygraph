@@ -1,0 +1,90 @@
+[build-system]
+requires = ["hatchling>=1.27,<1.32"]
+build-backend = "hatchling.build"
+
+[project]
+name = "memorygraph-agent"
+version = "0.1.0a0"
+description = "Evidence-backed, temporal belief revision for AI agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "MemoryGraph contributors" }]
+keywords = ["agents", "memory", "temporal-graph", "retrieval", "sqlite"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "typer>=0.12,<1",
+]
+
+[project.urls]
+Homepage = "https://github.com/xbrxr03/memorygraph"
+Repository = "https://github.com/xbrxr03/memorygraph"
+Issues = "https://github.com/xbrxr03/memorygraph/issues"
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2",
+    "pytest>=8,<10",
+    "ruff>=0.9",
+    "twine>=5,<7",
+]
+
+[project.scripts]
+memorygraph = "memorygraph.cli.main:main"
+memorygraph-mcp = "memorygraph.mcp.server:main"
+
+[tool.hatch.build]
+include = [
+    "/README.md",
+    "/src/memorygraph/**/*.py",
+    "/src/memorygraph/storage/migrations/*.sql",
+]
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/._*",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/memorygraph"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/README.md",
+    "/pyproject.toml",
+    "/Makefile",
+    "/src/memorygraph",
+    "/benchmarks",
+    "/examples",
+    "/docs",
+    "/tests",
+]
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/._*",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests", "benchmarks"]
+pythonpath = ["src", "."]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["._*", "**/._*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

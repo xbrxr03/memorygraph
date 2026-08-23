@@ -1,0 +1,47 @@
+{
+  "schema_version": "memoryrotbench.chaos_case/v1",
+  "case_id": "chaos-provider-failure-001",
+  "title": "Provider failure after validation causes zero partial mutation",
+  "acceptance_case": 10,
+  "description": "A failure between validation and commit must not leave partial writes behind.",
+  "observations": [
+    {
+      "observation_id": "obs-1",
+      "content": "I started at Stripe today."
+    }
+  ],
+  "steps": [
+    {
+      "step_id": "s1",
+      "type": "process_proposal",
+      "proposal": {
+        "proposal_id": "proposal-provider-failure",
+        "idempotency_key": "key-provider-failure",
+        "claim_id": "claim.alice_stripe",
+        "subject": "user:alice",
+        "predicate": "works_at",
+        "object_value": "Stripe",
+        "evidence_spans": [
+          {
+            "observation_id": "obs-1",
+            "start": 0,
+            "end": 25
+          }
+        ]
+      },
+      "fail_after_validation": true,
+      "expect": {
+        "exception": "InjectedProviderFailure"
+      }
+    }
+  ],
+  "final_assertion": {
+    "version": 0,
+    "active_claim_ids": [],
+    "evidence_ids": ["obs-1"],
+    "current_view": [],
+    "artifact_ids": [],
+    "committed_run_ids": [],
+    "history_claim_ids": []
+  }
+}

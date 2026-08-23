@@ -1,0 +1,101 @@
+{
+  "schema_version": "memoryrotbench.scenario/v1",
+  "scenario_id": "contested-authority-001",
+  "title": "Equal-authority sources remain contested instead of auto-resolved",
+  "category": "conflicting_sources",
+  "bank_id": "project:mercury",
+  "description": "Two authoritative repository sources disagree on the current build backend and should remain contested.",
+  "acceptance_cases": [6],
+  "entities": [
+    {
+      "entity_id": "project:mercury",
+      "canonical_name": "Mercury",
+      "type": "project",
+      "aliases": ["mercury"]
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "claim.mercury_backend_poetry",
+      "subject": "project:mercury",
+      "predicate": "uses_build_backend",
+      "object": {
+        "kind": "string",
+        "value": "poetry"
+      },
+      "cardinality": "one",
+      "stability": "volatile",
+      "valid_from": "2026-03-01T12:00:00Z",
+      "valid_to": null,
+      "lifecycle": "contested",
+      "summary": "Mercury uses Poetry as its build backend",
+      "evidence_event_ids": ["e1"],
+      "source_authority": "authoritative_repository_file"
+    },
+    {
+      "claim_id": "claim.mercury_backend_hatchling",
+      "subject": "project:mercury",
+      "predicate": "uses_build_backend",
+      "object": {
+        "kind": "string",
+        "value": "hatchling"
+      },
+      "cardinality": "one",
+      "stability": "volatile",
+      "valid_from": "2026-03-01T12:05:00Z",
+      "valid_to": null,
+      "lifecycle": "contested",
+      "summary": "Mercury uses Hatchling as its build backend",
+      "evidence_event_ids": ["e2"],
+      "source_authority": "authoritative_repository_file"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "e1",
+      "at": "2026-03-01T12:00:00Z",
+      "effective_at": "2026-03-01T12:00:00Z",
+      "kind": "file_import",
+      "actor": "tool",
+      "source_type": "repository_file",
+      "trust": "trusted",
+      "authority": "authoritative_file",
+      "content": "pyproject.toml declares build-backend = \"poetry.core.masonry.api\"",
+      "expected_outcomes": [
+        {"action": "assert", "claim_id": "claim.mercury_backend_poetry"}
+      ]
+    },
+    {
+      "event_id": "e2",
+      "at": "2026-03-01T12:05:00Z",
+      "effective_at": "2026-03-01T12:05:00Z",
+      "kind": "file_import",
+      "actor": "tool",
+      "source_type": "repository_file",
+      "trust": "trusted",
+      "authority": "authoritative_file",
+      "content": "docs/build.md says the project migrated to Hatchling.",
+      "expected_outcomes": [
+        {"action": "contest", "claim_id": "claim.mercury_backend_hatchling"}
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q1",
+      "after_event": "e2",
+      "question": "What build backend is Mercury currently using?",
+      "outcome": {
+        "type": "contested"
+      },
+      "required_claim_ids": [
+        "claim.mercury_backend_poetry",
+        "claim.mercury_backend_hatchling"
+      ],
+      "required_evidence_event_ids": ["e1", "e2"],
+      "forbidden_current_claim_ids": [],
+      "forbidden_bank_ids": [],
+      "forbidden_answer_fragments": []
+    }
+  ]
+}

@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://memorygraph.dev/memoryrotbench/scenario.schema.json",
+  "title": "MemoryRotBench Scenario v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "title",
+    "category",
+    "bank_id",
+    "description",
+    "acceptance_cases",
+    "entities",
+    "claims",
+    "events",
+    "queries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "memoryrotbench.scenario/v1"
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "state_replacement",
+        "historical_mention_trap",
+        "multi_valued_truth",
+        "negation_and_correction",
+        "delayed_reporting",
+        "conflicting_sources",
+        "stable_facts",
+        "expiring_state",
+        "duplicate_paraphrase",
+        "entity_ambiguity",
+        "procedural_learning",
+        "premise_awareness",
+        "abstention",
+        "summary_drift",
+        "poisoning_and_injection",
+        "isolation",
+        "deletion_and_revocation"
+      ]
+    },
+    "bank_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "acceptance_cases": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "minItems": 1
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["entity_id", "canonical_name", "type", "aliases"],
+        "properties": {
+          "entity_id": {"type": "string", "minLength": 1},
+          "canonical_name": {"type": "string", "minLength": 1},
+          "type": {"type": "string", "minLength": 1},
+          "aliases": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "claim_id",
+          "subject",
+          "predicate",
+          "object",
+          "cardinality",
+          "stability",
+          "lifecycle",
+          "summary",
+          "evidence_event_ids",
+          "source_authority"
+        ],
+        "properties": {
+          "claim_id": {"type": "string", "minLength": 1},
+          "subject": {"type": "string", "minLength": 1},
+          "predicate": {"type": "string", "minLength": 1},
+          "object": {
+            "type": "object",
+            "required": ["kind", "value"],
+            "properties": {
+              "kind": {"type": "string", "minLength": 1},
+              "value": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": false
+          },
+          "cardinality": {
+            "type": "string",
+            "enum": ["one", "many"]
+          },
+          "stability": {
+            "type": "string",
+            "enum": ["immutable", "durable", "volatile", "ephemeral"]
+          },
+          "valid_from": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "valid_to": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": ["current", "historical", "contested", "expired", "retracted"]
+          },
+          "summary": {"type": "string", "minLength": 1},
+          "evidence_event_ids": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+            "minItems": 1
+          },
+          "source_authority": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "at",
+          "kind",
+          "actor",
+          "source_type",
+          "trust",
+          "authority",
+          "content",
+          "expected_outcomes"
+        ],
+        "properties": {
+          "event_id": {"type": "string", "minLength": 1},
+          "at": {"type": "string", "format": "date-time"},
+          "effective_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "kind": {"type": "string", "minLength": 1},
+          "actor": {"type": "string", "minLength": 1},
+          "source_type": {"type": "string", "minLength": 1},
+          "trust": {"type": "string", "minLength": 1},
+          "authority": {"type": "string", "minLength": 1},
+          "content": {"type": "string", "minLength": 1},
+          "expected_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["action"],
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "assert",
+                    "confirm",
+                    "supersede",
+                    "correction",
+                    "historical_reference",
+                    "coexists",
+                    "contest",
+                    "expire",
+                    "store_untrusted_content"
+                  ]
+                },
+                "claim_id": {"type": "string", "minLength": 1}
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "queries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["query_id", "after_event", "question", "outcome"],
+        "properties": {
+          "query_id": {"type": "string", "minLength": 1},
+          "after_event": {"type": "string", "minLength": 1},
+          "question": {"type": "string", "minLength": 1},
+          "outcome": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["answer", "abstain", "contested"]
+              },
+              "answer": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "acceptable_answers": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "required_claim_ids": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "forbidden_current_claim_ids": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "required_evidence_event_ids": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "forbidden_bank_ids": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "forbidden_answer_fragments": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

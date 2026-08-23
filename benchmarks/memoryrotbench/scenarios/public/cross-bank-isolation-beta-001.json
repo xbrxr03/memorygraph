@@ -1,0 +1,68 @@
+{
+  "schema_version": "memoryrotbench.scenario/v1",
+  "scenario_id": "cross-bank-isolation-beta-001",
+  "title": "Beta bank stays isolated from similarly named foreign bank",
+  "category": "isolation",
+  "bank_id": "project:apollo-beta",
+  "description": "Alpha and Beta both describe Apollo release commands, but recall must stay inside the target bank.",
+  "acceptance_cases": [8],
+  "entities": [
+    {
+      "entity_id": "project:apollo-beta",
+      "canonical_name": "Apollo",
+      "type": "project",
+      "aliases": ["apollo"]
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "claim.apollo_beta_release_command",
+      "subject": "project:apollo-beta",
+      "predicate": "release_command",
+      "object": {
+        "kind": "string",
+        "value": "pnpm shipit"
+      },
+      "cardinality": "one",
+      "stability": "durable",
+      "valid_from": "2026-05-20T11:05:00Z",
+      "valid_to": null,
+      "lifecycle": "current",
+      "summary": "Apollo Beta releases with pnpm shipit",
+      "evidence_event_ids": ["e1"],
+      "source_authority": "explicit_user"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "e1",
+      "at": "2026-05-20T11:05:00Z",
+      "effective_at": "2026-05-20T11:05:00Z",
+      "kind": "message",
+      "actor": "user",
+      "source_type": "conversation",
+      "trust": "trusted",
+      "authority": "owner",
+      "content": "For Apollo here, ship with pnpm shipit.",
+      "expected_outcomes": [
+        {"action": "assert", "claim_id": "claim.apollo_beta_release_command"}
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q1",
+      "after_event": "e1",
+      "question": "How do I ship Apollo from this bank?",
+      "outcome": {
+        "type": "answer",
+        "answer": "pnpm shipit"
+      },
+      "required_claim_ids": ["claim.apollo_beta_release_command"],
+      "required_evidence_event_ids": ["e1"],
+      "forbidden_current_claim_ids": [],
+      "forbidden_bank_ids": ["project:apollo-alpha"],
+      "forbidden_answer_fragments": ["./ops/release-alpha.sh"]
+    }
+  ]
+}
