@@ -8,6 +8,7 @@ import re
 import sqlite3
 import sys
 import tempfile
+from contextlib import closing
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -1339,8 +1340,8 @@ def _check_database_open(database: Path) -> DoctorCheck:
         with tempfile.TemporaryDirectory(prefix="memorygraph-doctor-") as tempdir:
             probe_path = Path(tempdir) / "probe.db"
             with (
-                sqlite3.connect(str(database)) as source,
-                sqlite3.connect(str(probe_path)) as probe,
+                closing(sqlite3.connect(str(database))) as source,
+                closing(sqlite3.connect(str(probe_path))) as probe,
             ):
                 source.backup(probe)
             with MemoryGraph.open(probe_path):

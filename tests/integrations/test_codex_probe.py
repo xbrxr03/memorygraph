@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -18,7 +19,7 @@ def test_inspect_codex_project_config_resolves_database_path_and_launcher_shape(
         "\n".join(
             [
                 "[mcp_servers.memorygraph]",
-                f'command = "{sys.executable}"',
+                f"command = {json.dumps(sys.executable)}",
                 'args = ["-m", "memorygraph.mcp", ".memorygraph/memory.db"]',
                 'default_tools_approval_mode = "writes"',
             ]
@@ -81,7 +82,7 @@ def test_probe_codex_mcp_runs_real_subprocess_using_project_config_and_local_mod
         "\n".join(
             [
                 "[mcp_servers.memorygraph]",
-                f'command = "{sys.executable}"',
+                f"command = {json.dumps(sys.executable)}",
                 'args = ["-m", "memorygraph.mcp", ".memorygraph/memory.db"]',
                 'default_tools_approval_mode = "writes"',
             ]
