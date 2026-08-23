@@ -228,6 +228,17 @@ then run `make dogfood-live`. The report tracks successful tasks, useful recall 
 forbidden recall, repeated mistakes, latency, tokens, tool calls, and retries. The full operating
 contract and event schema are in [`13-dogfood-beta.md`](13-dogfood-beta.md).
 
+Run the accelerated Beta gate without waiting for five organic projects:
+
+```bash
+make dogfood-beta
+```
+
+This runs five isolated, time-separated workstreams against no-memory, Markdown, and MemoryGraph,
+then composes the existing public retrieval and production chaos suites into one fingerprinted
+pass/fail report at `benchmarks/reports/dogfood-beta.json`. It is accelerated deterministic
+evidence, not a claim of five sustained users.
+
 ## Why a graph?
 
 The graph gives agents composable structure: entities are nodes and claims such as

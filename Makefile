@@ -1,4 +1,4 @@
-.PHONY: test lint format build package-check doctor demo dogfood-fixture dogfood-live
+.PHONY: test lint format build package-check doctor demo dogfood-fixture dogfood-live dogfood-beta
 
 test:
 	uv run --extra dev pytest
@@ -28,3 +28,6 @@ dogfood-live:
 	uv run memorygraph dogfood evaluate-live \
 		--ledger .memorygraph/dogfood/live-sessions.jsonl \
 		--output .memorygraph/dogfood/live-report.json
+
+dogfood-beta:
+	PYTHONPATH=src:. uv run python examples/run_dogfood_beta.py

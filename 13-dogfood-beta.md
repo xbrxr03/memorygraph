@@ -49,3 +49,14 @@ make dogfood-live
 
 The probe intentionally deletes its own temporary observation through the public MCP `forget`
 tool. A passing probe is lifecycle evidence, not retained product evidence.
+
+## Accelerated gate
+
+`make dogfood-beta` is the fast, repeatable pre-adoption gate. It simulates three time-separated
+sessions across MCP, retrieval, Dream, storage, and CLI workstreams; compares no-memory, Markdown,
+and MemoryGraph arms; and incorporates the public isolation/poisoning corpus plus all seven
+production chaos cases. The command fails if any required gate fails and writes a fingerprinted
+JSON report and append-only experiment ledger under `benchmarks/reports/`.
+
+Passing this gate supports the claim “accelerated deterministic multi-session evidence passed.”
+It does not replace the later claim that real users or projects sustained weekly usage.
