@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "memorygraph-agent"
-version = "0.1.0a0"
+version = "0.1.0b1"
 description = "Evidence-backed, temporal belief revision for AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,7 +12,7 @@ license = { text = "Apache-2.0" }
 authors = [{ name = "MemoryGraph contributors" }]
 keywords = ["agents", "memory", "temporal-graph", "retrieval", "sqlite"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
@@ -54,6 +54,7 @@ exclude = [
     "**/__pycache__",
     "**/*.pyc",
     "**/._*",
+    "/docs/releases/*.sha256",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -74,6 +75,7 @@ exclude = [
     "**/__pycache__",
     "**/*.pyc",
     "**/._*",
+    "/docs/releases/*.sha256",
 ]
 
 [tool.pytest.ini_options]

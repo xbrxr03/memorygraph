@@ -6,9 +6,9 @@ MemoryGraph is a local-first evidence and revision layer for AI-agent beliefs. I
 source observations, represents claims as a temporal graph, and explains why a claim is
 current, historical, or contested.
 
-## MVP status
+## Beta status
 
-The deterministic MVP is running. The authoritative architecture starts at
+MemoryGraph `0.1.0b1` is an installable Beta. The authoritative architecture starts at
 [`00-architecture-index.md`](00-architecture-index.md); the implemented kernel covers:
 
 - Immutable source observations.
@@ -36,7 +36,7 @@ The deterministic MVP is running. The authoritative architecture starts at
 - Cross-platform CI, package verification, and actionable `doctor` diagnostics.
 
 The real engine currently passes all 12 public MemoryRotBench queries and all seven production
-chaos contracts. The repository test suite has 196 passing tests at this checkpoint. In the first
+chaos contracts. The repository test suite has 205 passing tests at this checkpoint. In the first
 fingerprinted public matrix, the strongest simple baselines pass 7/12 while MemoryGraph passes
 12/12.
 
@@ -125,23 +125,31 @@ uv run memorygraph dream worker --bank personal:founder \
   --provider-model YOUR_MODEL --database /tmp/memorygraph-dream.db
 ```
 
-## Connect Codex
+## Connect Codex in five minutes
 
-Install the package, initialize a project bank, and add project-scoped MCP configuration:
+From a trusted repository, one idempotent command initializes the project database, creates or
+selects a bank, installs project-scoped MCP configuration, and exercises a real configured MCP
+lifecycle:
 
 ```bash
-uv run memorygraph init
-uv run memorygraph bank create project:my-app
-uv run memorygraph install-codex --project .
-uv run memorygraph probe-codex --project .
+memorygraph onboard-codex --project .
 ```
 
-The installer creates or repairs a `[mcp_servers.memorygraph]` block in `.codex/config.toml`,
-points it at the current Python environment's `memorygraph.mcp` STDIO module, and configures Codex
-to prompt for writes. It does not modify global Codex configuration. The five MCP operations
+The default bank is derived from the directory name, such as `project:my-app`. Override it with
+`--bank project:chosen`. The default database is `.memorygraph/memory.db` inside the target
+project; relative `--database` paths also resolve inside that project.
+
+On success, the command prints `READY` after initialize, tool discovery, record, recall, and forget
+all pass through the configured subprocess. On failure, it names the failed stage and a recovery
+action. The project configuration uses `required = false`, so an unavailable memory server does
+not block Codex. Memory writes still prompt for approval.
+
+The lower-level `init`, `bank create`, `install-codex`, and `probe-codex` commands remain available
+for custom automation. The installer creates or repairs only `[mcp_servers.memorygraph]` in
+`.codex/config.toml`; it does not modify global Codex configuration. The five MCP operations
 require explicit bank scope.
 
-`probe-codex` validates the project config and exercises a real MCP subprocess lifecycle. Use
+`probe-codex` validates project config and exercises a real MCP subprocess lifecycle. Use
 `--project-database` if you want the probe to hit the configured project database instead of
 temporary disposable probe DBs.
 

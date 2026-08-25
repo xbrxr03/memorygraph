@@ -971,6 +971,125 @@ def install_codex(
     """Create or repair project-scoped Codex MCP configuration."""
 
     project_path = project_directory.expanduser().resolve()
+    config_path, changed = _install_codex_project_config(
+        project_path,
+        database_argument=database_argument,
+    )
+    if not changed:
+        typer.echo(f"MemoryGraph MCP already configured in {config_path}")
+        return
+    typer.echo(f"Configured MemoryGraph MCP in {config_path}")
+
+
+@app.command("onboard-codex")
+def onboard_codex(
+    project_directory: Annotated[
+        Path,
+        typer.Option("--project", help="Trusted project directory to configure."),
+    ] = DEFAULT_PROJECT_DIRECTORY,
+    bank: Annotated[
+        str | None,
+        typer.Option("--bank", help="Project bank slug; defaults from the directory name."),
+    ] = None,
+    database: Annotated[
+        Path | None,
+        typer.Option(
+            "--database",
+            "-d",
+            help="Database path; relative paths resolve inside the project.",
+        ),
+    ] = None,
+) -> None:
+    """Initialize and live-verify MemoryGraph for Codex in one command."""
+
+    project_path = project_directory.expanduser().resolve()
+    if not project_path.is_dir():
+        typer.echo(f"[FAIL] project: directory does not exist: {project_path}", err=True)
+        typer.echo(
+            "  action: create the directory or pass --project with a trusted repository",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    database_path = _onboarding_database_path(project_path, database)
+    bank_slug = bank or _default_project_bank(project_path)
+    typer.echo(f"MemoryGraph Codex onboarding for {project_path}")
+
+    try:
+        existed_before = database_path.exists()
+        with MemoryGraph.open(database_path) as memory:
+            bank_record = memory.create_bank(bank_slug, name=project_path.name)
+    except Exception as error:  # noqa: BLE001 - CLI boundary must produce recovery guidance
+        typer.echo(f"[FAIL] database/bank: {error}", err=True)
+        typer.echo(f"  action: check write access to {database_path.parent}", err=True)
+        raise typer.Exit(code=1) from error
+    database_status = "opened" if existed_before else "initialized"
+    typer.echo(f"[OK] database: {database_status} {database_path}")
+    typer.echo(f"[OK] bank: selected {bank_record.slug} ({bank_record.id})")
+
+    database_argument = _database_argument_for_project(project_path, database_path)
+    try:
+        config_path, changed = _install_codex_project_config(
+            project_path,
+            database_argument=database_argument,
+        )
+    except OSError as error:
+        typer.echo(f"[FAIL] Codex config: {error}", err=True)
+        typer.echo(f"  action: check write access to {project_path / '.codex'}", err=True)
+        raise typer.Exit(code=1) from error
+    config_status = "configured" if changed else "already configured"
+    typer.echo(f"[OK] Codex config: {config_status} at {config_path}")
+
+    try:
+        report = probe_codex_mcp(
+            project_path,
+            database_mode="project",
+            launch_sources=("config",),
+        )
+    except Exception as error:  # noqa: BLE001 - convert probe crashes into safe diagnostics
+        typer.echo(f"[FAIL] live MCP probe: {error}", err=True)
+        typer.echo(
+            f"  action: run `memorygraph probe-codex --project {project_path} "
+            "--project-database --configured-only` after fixing the reported environment issue",
+            err=True,
+        )
+        typer.echo(
+            "  safe state: the database and optional MCP config remain local; "
+            "Codex is configured with required=false",
+            err=True,
+        )
+        raise typer.Exit(code=1) from error
+    if not report.ok:
+        typer.echo("[FAIL] live MCP probe: configured server did not pass", err=True)
+        launch_issues = tuple(issue for launch in report.launches for issue in launch.issues)
+        for issue in (*report.configuration.issues, *launch_issues):
+            typer.echo(f"  {issue.code}: {issue.message}", err=True)
+            if issue.action:
+                typer.echo(f"  action: {issue.action}", err=True)
+        typer.echo(
+            "  safe state: the database and optional MCP config remain local; "
+            "Codex is configured with required=false",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    launch = report.launches[0]
+    typer.echo(
+        "[OK] live MCP probe: initialize, five tools, record, recall, and forget "
+        f"passed ({launch.protocol_version})"
+    )
+    typer.echo(f"READY: bank={bank_record.slug} database={database_path}")
+    typer.echo(
+        "Next: open a fresh Codex task in this project; "
+        "MemoryGraph fails open if unavailable."
+    )
+
+
+def _install_codex_project_config(
+    project_path: Path,
+    *,
+    database_argument: str,
+) -> tuple[Path, bool]:
     config_path = project_path / ".codex" / "config.toml"
     existing = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -986,10 +1105,9 @@ def install_codex(
     )
     updated = _upsert_toml_table(existing, "mcp_servers.memorygraph", block)
     if updated == existing:
-        typer.echo(f"MemoryGraph MCP already configured in {config_path}")
-        return
+        return config_path, False
     config_path.write_text(updated, encoding="utf-8")
-    typer.echo(f"Configured MemoryGraph MCP in {config_path}")
+    return config_path, True
 
 
 @app.command("probe-codex")
@@ -1131,6 +1249,26 @@ def _upsert_toml_table(existing: str, table_name: str, block: str) -> str:
         return "\n\n".join(pieces) + "\n"
     prefix = existing.rstrip()
     return f"{prefix}\n\n{normalized_block}" if prefix else normalized_block
+
+
+def _onboarding_database_path(project_path: Path, database: Path | None) -> Path:
+    requested = database or Path(".memorygraph/memory.db")
+    expanded = requested.expanduser()
+    if not expanded.is_absolute():
+        expanded = project_path / expanded
+    return expanded.resolve()
+
+
+def _database_argument_for_project(project_path: Path, database_path: Path) -> str:
+    try:
+        return str(database_path.relative_to(project_path))
+    except ValueError:
+        return str(database_path)
+
+
+def _default_project_bank(project_path: Path) -> str:
+    normalized = re.sub(r"[^a-z0-9._-]+", "-", project_path.name.lower()).strip("-.")
+    return f"project:{normalized or 'default'}"
 
 
 def _parse_cli_object(value: str, object_kind: str) -> object:

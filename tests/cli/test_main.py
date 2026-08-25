@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -154,6 +155,78 @@ class CliMainTests(unittest.TestCase):
         self.assertEqual(config.count("[mcp_servers.memorygraph]"), 1)
         self.assertIn(f"command = {json.dumps(sys.executable)}", config)
         self.assertIn("[features]\nexample = true", config)
+
+    def test_onboard_codex_runs_complete_project_scoped_lifecycle_idempotently(self) -> None:
+        project = self.tmp_path / "My Beta Project"
+        project.mkdir()
+
+        first = self.runner.invoke(app, ["onboard-codex", "--project", str(project)])
+        second = self.runner.invoke(app, ["onboard-codex", "--project", str(project)])
+
+        self.assertEqual(first.exit_code, 0, first.stdout)
+        self.assertEqual(second.exit_code, 0, second.stdout)
+        self.assertIn("[OK] database: initialized", first.stdout)
+        self.assertIn("[OK] bank: selected project:my-beta-project", first.stdout)
+        self.assertIn("[OK] live MCP probe:", first.stdout)
+        self.assertIn("READY:", first.stdout)
+        self.assertIn("[OK] database: opened", second.stdout)
+        self.assertIn("already configured", second.stdout)
+
+        database = project / ".memorygraph" / "memory.db"
+        self.assertTrue(database.exists())
+        with MemoryGraph.open(database) as memory:
+            self.assertEqual(
+                memory.get_bank("project:my-beta-project").slug,
+                "project:my-beta-project",
+            )
+        config = (project / ".codex" / "config.toml").read_text(encoding="utf-8")
+        self.assertIn('args = ["-m", "memorygraph.mcp", ".memorygraph/memory.db"]', config)
+
+    def test_onboard_codex_accepts_explicit_bank_and_external_database(self) -> None:
+        project = self.tmp_path / "project"
+        project.mkdir()
+        database = self.tmp_path / "state" / "memory.db"
+
+        result = self.runner.invoke(
+            app,
+            [
+                "onboard-codex",
+                "--project",
+                str(project),
+                "--bank",
+                "project:chosen",
+                "--database",
+                str(database),
+            ],
+        )
+
+        self.assertEqual(result.exit_code, 0, result.stdout)
+        self.assertIn("bank: selected project:chosen", result.stdout)
+        config = (project / ".codex" / "config.toml").read_text(encoding="utf-8")
+        self.assertIn(json.dumps(str(database.resolve())), config)
+
+    def test_onboard_codex_reports_missing_project_without_side_effects(self) -> None:
+        project = self.tmp_path / "missing"
+
+        result = self.runner.invoke(app, ["onboard-codex", "--project", str(project)])
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("[FAIL] project:", result.stderr)
+        self.assertIn("action:", result.stderr)
+        self.assertFalse(project.exists())
+
+    def test_onboard_codex_converts_probe_crash_to_fail_open_diagnostic(self) -> None:
+        project = self.tmp_path / "project"
+        project.mkdir()
+
+        with patch("memorygraph.cli.main.probe_codex_mcp", side_effect=OSError("probe crashed")):
+            result = self.runner.invoke(app, ["onboard-codex", "--project", str(project)])
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIn("[FAIL] live MCP probe: probe crashed", result.stderr)
+        self.assertIn("required=false", result.stderr)
+        self.assertTrue((project / ".memorygraph" / "memory.db").exists())
+        self.assertTrue((project / ".codex" / "config.toml").exists())
 
     def test_probe_codex_command_runs_configured_and_local_lifecycle(self) -> None:
         project = self.tmp_path / "project"
