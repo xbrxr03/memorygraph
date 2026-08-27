@@ -757,7 +757,7 @@ class MemoryGraph:
                 object_kind=replacement_kind,
                 object_type=object_type,
             )
-            commit_time = _parse_timestamp(known_at) or datetime.now(UTC)
+            commit_time = _transition_commit_time(current_record.system_from, known_at)
             plan = plan_contradict(
                 claim_from_record(current_record),
                 ClaimTemplate(
@@ -918,7 +918,7 @@ class MemoryGraph:
                 object_kind=replacement_kind,
                 object_type=object_type,
             )
-            commit_time = _parse_timestamp(known_at) or datetime.now(UTC)
+            commit_time = _transition_commit_time(current_record.system_from, known_at)
             replacement_valid_from = _parse_timestamp(valid_from)
             replacement_valid_to = _parse_timestamp(valid_to)
             plan = plan_supersede(
@@ -1060,7 +1060,7 @@ class MemoryGraph:
             if observation_id is None
             else self._observation(bank_record.id, observation_id)
         )
-        commit_time = _parse_timestamp(known_at) or datetime.now(UTC)
+        commit_time = _transition_commit_time(current.system_from, known_at)
         replacement_interval = None
         if effective_at is not None:
             replacement_interval = HalfOpenInterval(
@@ -2126,6 +2126,16 @@ def _strict_successor_timestamp(prior: str, candidate: str) -> str:
     candidate_time = _parse_timestamp(candidate)
     assert prior_time is not None and candidate_time is not None
     return _format_timestamp(max(candidate_time, prior_time + timedelta(microseconds=1)))
+
+
+def _transition_commit_time(prior: str, known_at: str | None) -> datetime:
+    explicit = _parse_timestamp(known_at)
+    if explicit is not None:
+        return explicit
+    candidate = _format_timestamp(datetime.now(UTC))
+    adjusted = _parse_timestamp(_strict_successor_timestamp(prior, candidate))
+    assert adjusted is not None
+    return adjusted
 
 
 def _proposal_action(value: Any) -> dict[str, Any]:

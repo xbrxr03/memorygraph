@@ -4,13 +4,13 @@ import json
 import sys
 import tempfile
 import unittest
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest.mock import patch
 
 from typer.testing import CliRunner
 
 from memorygraph import MemoryGraph
-from memorygraph.cli.main import app
+from memorygraph.cli.main import _database_argument_for_project, app
 from memorygraph.storage.database import DatabaseConfig, connect
 
 
@@ -204,6 +204,21 @@ class CliMainTests(unittest.TestCase):
         self.assertIn("bank: selected project:chosen", result.stdout)
         config = (project / ".codex" / "config.toml").read_text(encoding="utf-8")
         self.assertIn(json.dumps(str(database.resolve())), config)
+
+    def test_onboarding_database_argument_is_posix_relative_but_native_absolute(self) -> None:
+        project = PureWindowsPath("C:/work/project")
+
+        relative = _database_argument_for_project(
+            project,
+            PureWindowsPath("C:/work/project/.memorygraph/memory.db"),
+        )
+        external = _database_argument_for_project(
+            project,
+            PureWindowsPath("D:/state/memory.db"),
+        )
+
+        self.assertEqual(relative, ".memorygraph/memory.db")
+        self.assertEqual(external, r"D:\state\memory.db")
 
     def test_onboard_codex_reports_missing_project_without_side_effects(self) -> None:
         project = self.tmp_path / "missing"

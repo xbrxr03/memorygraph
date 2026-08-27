@@ -11,7 +11,7 @@ import tempfile
 from contextlib import closing
 from dataclasses import dataclass
 from importlib import resources
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Annotated
 
 import typer
@@ -1259,9 +1259,12 @@ def _onboarding_database_path(project_path: Path, database: Path | None) -> Path
     return expanded.resolve()
 
 
-def _database_argument_for_project(project_path: Path, database_path: Path) -> str:
+def _database_argument_for_project(
+    project_path: PurePath,
+    database_path: PurePath,
+) -> str:
     try:
-        return str(database_path.relative_to(project_path))
+        return database_path.relative_to(project_path).as_posix()
     except ValueError:
         return str(database_path)
 

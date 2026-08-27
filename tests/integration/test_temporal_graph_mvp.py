@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from memorygraph import MemoryGraph, ValidationError
 
@@ -381,3 +383,37 @@ def test_failed_supersession_rolls_back_claims_relations_and_search_view() -> No
     assert [hit.event_id for hit in current] == ["event:acme"]
     assert [(item.object, item.claim.lifecycle) for item in history] == [("Acme", "active")]
     assert relation_count == 0
+
+
+def test_implicit_supersession_advances_system_time_when_clock_does_not() -> None:
+    frozen = datetime(2026, 8, 27, 12, tzinfo=UTC)
+
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[no-untyped-def]
+            return frozen if tz is not None else frozen.replace(tzinfo=None)
+
+    with (
+        tempfile.TemporaryDirectory() as directory,
+        patch("memorygraph.api.datetime", FrozenDatetime),
+        MemoryGraph.open(Path(directory) / "memory.db") as memory,
+    ):
+        bank = memory.create_bank("project:coarse-clock")
+        first = memory.observe("Mira works at Acme.", bank=bank.id, source_key="event:acme")
+        second = memory.observe("Mira works at Stripe.", bank=bank.id, source_key="event:stripe")
+        claim = memory.assert_claim(
+            bank=bank.id,
+            subject="Mira",
+            predicate="works_at",
+            object="Acme",
+            observation_id=first.id,
+        )
+
+        replacement = memory.supersede_claim(
+            claim.id,
+            bank=bank.id,
+            object="Stripe",
+            observation_id=second.id,
+        )
+
+    assert replacement.system_from > claim.system_from

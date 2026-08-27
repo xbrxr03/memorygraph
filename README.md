@@ -36,7 +36,7 @@ MemoryGraph `0.1.0b1` is an installable Beta. The authoritative architecture sta
 - Cross-platform CI, package verification, and actionable `doctor` diagnostics.
 
 The real engine currently passes all 12 public MemoryRotBench queries and all seven production
-chaos contracts. The repository test suite has 205 passing tests at this checkpoint. In the first
+chaos contracts. The repository test suite has 207 passing tests at this checkpoint. In the first
 fingerprinted public matrix, the strongest simple baselines pass 7/12 while MemoryGraph passes
 12/12.
 
