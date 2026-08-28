@@ -14,5 +14,6 @@ Reports should include:
 - Whether untrusted content reached a directive, another bank, or an agent action.
 - Suggested mitigation, if known.
 
-Never include real credentials or private user memory in a report. A private reporting address
-will be added before the first public release.
+Never include real credentials or private user memory in a report. Submit suspected
+vulnerabilities through [GitHub private vulnerability reporting](https://github.com/xbrxr03/memorygraph/security/advisories/new)
+so the report and follow-up remain private until coordinated disclosure is appropriate.
